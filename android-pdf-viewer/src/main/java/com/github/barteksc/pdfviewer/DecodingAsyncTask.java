@@ -26,14 +26,14 @@ import java.lang.ref.WeakReference;
 
 class DecodingAsyncTask extends AsyncTask<Void, Void, Throwable> {
 
-    private boolean cancelled;
+    private volatile boolean cancelled;
 
-    private WeakReference<PDFView> pdfViewReference;
+    private final WeakReference<PDFView> pdfViewReference;
 
-    private PdfiumCore pdfiumCore;
-    private String password;
-    private DocumentSource docSource;
-    private int[] userPages;
+    private final PdfiumCore pdfiumCore;
+    private final String password;
+    private final DocumentSource docSource;
+    private final int[] userPages;
     private PdfFile pdfFile;
 
     DecodingAsyncTask(DocumentSource docSource, String password, int[] userPages, PDFView pdfView, PdfiumCore pdfiumCore) {
@@ -81,12 +81,10 @@ class DecodingAsyncTask extends AsyncTask<Void, Void, Throwable> {
     @Override
     protected void onPostExecute(Throwable t) {
         PDFView pdfView = pdfViewReference.get();
-        if (pdfView != null) {
+        if (pdfView != null && !cancelled) {
             if (t != null) {
                 pdfView.loadError(t);
-                return;
-            }
-            if (!cancelled) {
+            } else {
                 pdfView.loadComplete(pdfFile);
             }
         }

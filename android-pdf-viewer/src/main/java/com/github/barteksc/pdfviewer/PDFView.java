@@ -36,6 +36,9 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.widget.RelativeLayout;
 
+import androidx.core.os.HandlerCompat;
+import androidx.core.view.ViewCompat;
+
 import com.github.barteksc.pdfviewer.exception.PageRenderingException;
 import com.github.barteksc.pdfviewer.link.DefaultLinkHandler;
 import com.github.barteksc.pdfviewer.link.LinkHandler;
@@ -284,6 +287,12 @@ public class PDFView extends RelativeLayout {
      */
     private boolean hasSize = false;
 
+
+    /**
+     * Controls whether {@link #recycle()} is automatically called in {@link #onDetachedFromWindow()}.
+     */
+    private boolean recycleOnDetachEnabled = true;
+
     /**
      * Holds last used Configurator that should be loaded when view has size
      */
@@ -294,8 +303,6 @@ public class PDFView extends RelativeLayout {
      */
     public PDFView(Context context, AttributeSet set) {
         super(context, set);
-
-        renderingHandlerThread = new HandlerThread("PDF renderer");
 
         if (isInEditMode()) {
             return;
@@ -470,10 +477,19 @@ public class PDFView extends RelativeLayout {
         // Stop tasks
         if (renderingHandler != null) {
             renderingHandler.stop();
-            renderingHandler.removeMessages(RenderingHandler.MSG_RENDER_TASK);
         }
+
         if (decodingAsyncTask != null) {
             decodingAsyncTask.cancel(true);
+        }
+
+        if (renderingHandlerThread != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                renderingHandlerThread.quitSafely();
+            } else {
+                renderingHandlerThread.quit();
+            }
+            renderingHandlerThread = null;
         }
 
         // Clear caches
@@ -483,9 +499,10 @@ public class PDFView extends RelativeLayout {
             scrollHandle.destroyLayout();
         }
 
-        if (pdfFile != null) {
-            pdfFile.dispose();
-            pdfFile = null;
+        final PdfFile currentPdfFile = this.pdfFile;
+        this.pdfFile = null;
+        if (currentPdfFile != null) {
+            AsyncTask.THREAD_POOL_EXECUTOR.execute(currentPdfFile::dispose);
         }
 
         renderingHandler = null;
@@ -516,14 +533,8 @@ public class PDFView extends RelativeLayout {
 
     @Override
     protected void onDetachedFromWindow() {
-        recycle();
-        if (renderingHandlerThread != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                renderingHandlerThread.quitSafely();
-            } else {
-                renderingHandlerThread.quit();
-            }
-            renderingHandlerThread = null;
+        if (recycleOnDetachEnabled) {
+            recycle();
         }
         super.onDetachedFromWindow();
     }
@@ -794,7 +805,7 @@ public class PDFView extends RelativeLayout {
         }
 
         // Cancel all current tasks
-        renderingHandler.removeMessages(RenderingHandler.MSG_RENDER_TASK);
+        renderingHandler.purge();
         cacheManager.makeANewSet();
 
         pagesLoader.loadPages();
@@ -811,9 +822,6 @@ public class PDFView extends RelativeLayout {
 
         if (renderingHandlerThread == null) {
             renderingHandlerThread = new HandlerThread("PDF renderer");
-        }
-
-        if (!renderingHandlerThread.isAlive()) {
             renderingHandlerThread.start();
         }
 
@@ -1368,6 +1376,19 @@ public class PDFView extends RelativeLayout {
             return Collections.emptyList();
         }
         return pdfFile.getPageLinks(page);
+    }
+
+    public boolean isRecycleOnDetachEnabled() {
+        return recycleOnDetachEnabled;
+    }
+
+    public void setRecycleOnDetachEnabled(boolean recycleOnDetachEnabled) {
+        if (this.recycleOnDetachEnabled != recycleOnDetachEnabled) {
+            this.recycleOnDetachEnabled = recycleOnDetachEnabled;
+            if (recycleOnDetachEnabled && !ViewCompat.isAttachedToWindow(this) && !isRecycled()) {
+                recycle();
+            }
+        }
     }
 
     /**

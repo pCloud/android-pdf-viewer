@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2016 Bartosz Schiller
  * <p/>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,6 @@
 package com.github.barteksc.pdfviewer;
 
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -37,39 +36,43 @@ class RenderingHandler extends Handler {
     /**
      * {@link Message#what} kind of message this handler processes.
      */
-    static final int MSG_RENDER_TASK = 1;
+    private static final int MSG_RENDER_TASK = 1;
 
     private static final String TAG = RenderingHandler.class.getName();
 
-    private PDFView pdfView;
+    private final PDFView pdfView;
 
-    private RectF renderBounds = new RectF();
-    private Rect roundedRenderBounds = new Rect();
-    private Matrix renderMatrix = new Matrix();
-    private boolean running = false;
+    private final RectF renderBounds = new RectF();
+    private final Rect roundedRenderBounds = new Rect();
+    private final Matrix renderMatrix = new Matrix();
+    private volatile boolean running = false;
 
     RenderingHandler(Looper looper, PDFView pdfView) {
         super(looper);
         this.pdfView = pdfView;
     }
 
-    void addRenderingTask(int page, float width, float height, RectF bounds, boolean thumbnail, int cacheOrder, boolean bestQuality, boolean annotationRendering) {
-        RenderingTask task = new RenderingTask(width, height, bounds, page, thumbnail, cacheOrder, bestQuality, annotationRendering);
+    void addRenderingTask(PdfFile pdfFile, int page, float width, float height, RectF bounds, boolean thumbnail, int cacheOrder, boolean bestQuality, boolean annotationRendering) {
+        RenderingTask task = new RenderingTask(pdfFile, width, height, bounds, page, thumbnail, cacheOrder, bestQuality, annotationRendering);
         Message msg = obtainMessage(MSG_RENDER_TASK, task);
         sendMessage(msg);
     }
 
     @Override
     public void handleMessage(Message message) {
+        if (!running) {
+            return;
+        }
         RenderingTask task = (RenderingTask) message.obj;
         try {
             final PagePart part = proceed(task);
             if (part != null) {
                 if (running) {
-                    pdfView.post(new Runnable() {
-                        @Override
-                        public void run() {
+                    pdfView.post(() -> {
+                        if (running) {
                             pdfView.onBitmapRendered(part);
+                        } else {
+                            part.getRenderedBitmap().recycle();
                         }
                     });
                 } else {
@@ -77,9 +80,8 @@ class RenderingHandler extends Handler {
                 }
             }
         } catch (final PageRenderingException ex) {
-            pdfView.post(new Runnable() {
-                @Override
-                public void run() {
+            pdfView.post(() -> {
+                if (running) {
                     pdfView.onPageError(ex);
                 }
             });
@@ -87,7 +89,7 @@ class RenderingHandler extends Handler {
     }
 
     private PagePart proceed(RenderingTask renderingTask) throws PageRenderingException {
-        PdfFile pdfFile = pdfView.pdfFile;
+        final PdfFile pdfFile = renderingTask.pdfFile;
         pdfFile.openPage(renderingTask.page);
 
         int w = Math.round(renderingTask.width);
@@ -125,29 +127,46 @@ class RenderingHandler extends Handler {
 
     void stop() {
         running = false;
+        removeMessages(MSG_RENDER_TASK);
     }
 
     void start() {
         running = true;
     }
 
-    private class RenderingTask {
+    void purge() {
+        removeMessages(MSG_RENDER_TASK);
+    }
 
-        float width, height;
+    private static class RenderingTask {
 
-        RectF bounds;
+        final PdfFile pdfFile;
 
-        int page;
+        final float width, height;
 
-        boolean thumbnail;
+        final RectF bounds;
 
-        int cacheOrder;
+        final int page;
 
-        boolean bestQuality;
+        final boolean thumbnail;
 
-        boolean annotationRendering;
+        final int cacheOrder;
 
-        RenderingTask(float width, float height, RectF bounds, int page, boolean thumbnail, int cacheOrder, boolean bestQuality, boolean annotationRendering) {
+        final boolean bestQuality;
+
+        final boolean annotationRendering;
+
+        RenderingTask(
+                PdfFile pdfFile,
+                float width,
+                float height,
+                RectF bounds,
+                int page,
+                boolean thumbnail,
+                int cacheOrder,
+                boolean bestQuality,
+                boolean annotationRendering) {
+            this.pdfFile = pdfFile;
             this.page = page;
             this.width = width;
             this.height = height;

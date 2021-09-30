@@ -30,7 +30,7 @@ import static com.github.barteksc.pdfviewer.util.Constants.PRELOAD_OFFSET;
 
 class PagesLoader {
 
-    private PDFView pdfView;
+    private final PDFView pdfView;
     private int cacheOrder;
     private float xOffset;
     private float yOffset;
@@ -41,7 +41,7 @@ class PagesLoader {
     private final RectF thumbnailRect = new RectF(0, 0, 1, 1);
     private final int preloadOffset;
 
-    private class Holder {
+    private static class Holder {
         int row;
         int col;
 
@@ -54,7 +54,7 @@ class PagesLoader {
         }
     }
 
-    private class RenderRange {
+    private static class RenderRange {
         int page;
         GridSize gridSize;
         Holder leftTop;
@@ -78,7 +78,7 @@ class PagesLoader {
         }
     }
 
-    private class GridSize {
+    private static class GridSize {
         int rows;
         int cols;
 
@@ -285,7 +285,7 @@ class PagesLoader {
 
         if (renderWidth > 0 && renderHeight > 0) {
             if (!pdfView.cacheManager.upPartIfContained(page, pageRelativeBounds, cacheOrder)) {
-                pdfView.renderingHandler.addRenderingTask(page, renderWidth, renderHeight,
+                pdfView.renderingHandler.addRenderingTask(pdfView.pdfFile, page, renderWidth, renderHeight,
                         pageRelativeBounds, false, cacheOrder, pdfView.isBestQuality(),
                         pdfView.isAnnotationRendering());
             }
@@ -301,7 +301,7 @@ class PagesLoader {
         float thumbnailWidth = pageSize.getWidth() * Constants.THUMBNAIL_RATIO;
         float thumbnailHeight = pageSize.getHeight() * Constants.THUMBNAIL_RATIO;
         if (!pdfView.cacheManager.containsThumbnail(page, thumbnailRect)) {
-            pdfView.renderingHandler.addRenderingTask(page,
+            pdfView.renderingHandler.addRenderingTask(pdfView.pdfFile, page,
                     thumbnailWidth, thumbnailHeight, thumbnailRect,
                     true, 0, pdfView.isBestQuality(), pdfView.isAnnotationRendering());
         }

@@ -35,7 +35,7 @@ class PdfFile {
 
     private static final Object lock = new Object();
     private PdfDocument pdfDocument;
-    private PdfiumCore pdfiumCore;
+    private final PdfiumCore pdfiumCore;
     private int pagesCount = 0;
     /** Original page sizes */
     private List<Size> originalPageSizes = new ArrayList<>();
