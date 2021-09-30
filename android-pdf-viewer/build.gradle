@@ -12,6 +12,6 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core:1.3.1'
-    api 'com.github.TalbotGooday:PdfiumAndroid:1.0.1'
+    implementation 'androidx.core:core:1.6.0'
+    api 'com.github.pcloud:pdfium-core:1.0.0'
 }
