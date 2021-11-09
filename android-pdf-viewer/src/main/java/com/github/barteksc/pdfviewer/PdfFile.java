@@ -18,7 +18,10 @@ package com.github.barteksc.pdfviewer;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.util.SparseArray;
 import android.util.SparseBooleanArray;
+
+import androidx.core.util.ObjectsCompat;
 
 import com.github.barteksc.pdfviewer.exception.PageRenderingException;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
@@ -30,10 +33,13 @@ import com.shockwave.pdfium.util.SizeF;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 class PdfFile {
 
-    private static final Object lock = new Object();
     private PdfDocument pdfDocument;
     private final PdfiumCore pdfiumCore;
     private int pagesCount = 0;
@@ -42,7 +48,8 @@ class PdfFile {
     /** Scaled page sizes */
     private List<SizeF> pageSizes = new ArrayList<>();
     /** Opened pages with indicator whether opening was successful */
-    private SparseBooleanArray openedPages = new SparseBooleanArray();
+    private final ConcurrentHashMap<Integer, Boolean> openedPages = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer,List<PdfDocument.Link>> openedPageLinks = new ConcurrentHashMap<>();
     /** Page with maximum width */
     private Size originalMaxWidthPageSize = new Size(0, 0);
     /** Page with maximum height */
@@ -270,30 +277,39 @@ class PdfFile {
         return --currentPage >= 0 ? currentPage : 0;
     }
 
+    public boolean isPageOpen(int pageIndex) {
+        return openedPages.containsKey(documentPage(pageIndex));
+    }
+
     public boolean openPage(int pageIndex) throws PageRenderingException {
         int docPage = documentPage(pageIndex);
         if (docPage < 0) {
             return false;
         }
 
-        synchronized (lock) {
-            if (openedPages.indexOfKey(docPage) < 0) {
-                try {
-                    pdfiumCore.openPage(pdfDocument, docPage);
-                    openedPages.put(docPage, true);
-                    return true;
-                } catch (Exception e) {
-                    openedPages.put(docPage, false);
-                    throw new PageRenderingException(pageIndex, e);
+        if (!openedPages.containsKey(pageIndex)) {
+                if (!openedPages.containsKey(pageIndex)) {
+                    try {
+                        pdfiumCore.openPage(pdfDocument, docPage);
+                        openedPages.putIfAbsent(docPage, true);
+                        if (!openedPageLinks.containsKey(docPage)) {
+                            openedPageLinks.putIfAbsent(docPage, pdfiumCore.getPageLinks(pdfDocument, docPage));
+                        }
+                        return true;
+                    } catch (Exception e) {
+                        openedPages.put(docPage, false);
+                        throw new PageRenderingException(pageIndex, e);
+                    }
                 }
-            }
-            return false;
+                return false;
+        } else {
+            return true;
         }
     }
 
     public boolean pageHasError(int pageIndex) {
         int docPage = documentPage(pageIndex);
-        return !openedPages.get(docPage, false);
+        return !ObjectsCompat.equals(true,openedPages.get(docPage));
     }
 
     public void renderPageBitmap(Bitmap bitmap, int pageIndex, Rect bounds, boolean annotationRendering) {
@@ -318,7 +334,7 @@ class PdfFile {
 
     public List<PdfDocument.Link> getPageLinks(int pageIndex) {
         int docPage = documentPage(pageIndex);
-        return pdfiumCore.getPageLinks(pdfDocument, docPage);
+        return openedPageLinks.get(docPage);
     }
 
     public RectF mapRectToDevice(int pageIndex, int startX, int startY, int sizeX, int sizeY,

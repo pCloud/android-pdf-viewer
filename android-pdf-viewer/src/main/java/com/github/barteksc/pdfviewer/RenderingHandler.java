@@ -60,7 +60,7 @@ class RenderingHandler extends Handler {
 
     @Override
     public void handleMessage(Message message) {
-        if (!running) {
+        if (!running || message.what != MSG_RENDER_TASK) {
             return;
         }
         RenderingTask task = (RenderingTask) message.obj;
@@ -106,13 +106,22 @@ class RenderingHandler extends Handler {
             Log.e(TAG, "Cannot create bitmap", e);
             return null;
         }
-        calculateBounds(w, h, renderingTask.bounds);
+        boolean success = false;
+        PagePart result;
+        try {
+            calculateBounds(w, h, renderingTask.bounds);
+            pdfFile.renderPageBitmap(render, renderingTask.page, roundedRenderBounds, renderingTask.annotationRendering);
 
-        pdfFile.renderPageBitmap(render, renderingTask.page, roundedRenderBounds, renderingTask.annotationRendering);
-
-        return new PagePart(renderingTask.page, render,
-                renderingTask.bounds, renderingTask.thumbnail,
-                renderingTask.cacheOrder);
+            result = new PagePart(renderingTask.page, render,
+                    renderingTask.bounds, renderingTask.thumbnail,
+                    renderingTask.cacheOrder);
+            success = true;
+        } finally {
+            if (!success) {
+                render.recycle();
+            }
+        }
+        return result;
     }
 
     private void calculateBounds(int width, int height, RectF pageSliceBounds) {
@@ -127,7 +136,7 @@ class RenderingHandler extends Handler {
 
     void stop() {
         running = false;
-        removeMessages(MSG_RENDER_TASK);
+        purge();
     }
 
     void start() {

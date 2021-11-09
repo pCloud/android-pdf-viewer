@@ -30,13 +30,13 @@ import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.Build;
+import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.widget.RelativeLayout;
 
-import androidx.core.os.HandlerCompat;
 import androidx.core.view.ViewCompat;
 
 import com.github.barteksc.pdfviewer.exception.PageRenderingException;
@@ -167,11 +167,6 @@ public class PDFView extends RelativeLayout {
      * Current state of the view
      */
     private State state = State.DEFAULT;
-
-    /**
-     * Async task used during the loading phase to decode a PDF document
-     */
-    private DecodingAsyncTask decodingAsyncTask;
 
     /**
      * The thread {@link #renderingHandler} will run on
@@ -326,15 +321,58 @@ public class PDFView extends RelativeLayout {
     }
 
     private void load(DocumentSource docSource, String password, int[] userPages) {
-
         if (!recycled) {
             throw new IllegalStateException("Don't call load on a PDF View without recycling it first.");
         }
 
         recycled = false;
-        // Start decoding document
-        decodingAsyncTask = new DecodingAsyncTask(docSource, password, userPages, this, pdfiumCore);
-        decodingAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+
+        final Handler handler;
+        if (ViewCompat.isAttachedToWindow(this)) {
+            handler = getHandler();
+        } else {
+            handler = new Handler(Looper.myLooper());
+        }
+        startRenderingThread();
+        dispatchWorkOnRenderer(() -> {
+            PdfDocument pdfDocument = null;
+            Throwable loadError = null;
+            try {
+                pdfDocument = docSource.createDocument(getContext(), pdfiumCore, password);
+            } catch (Exception e) {
+                loadError = e;
+            }
+
+            PdfDocument finalPdfDocument = pdfDocument;
+            Throwable finalLoadError = loadError;
+
+            if (!handler.post(() -> {
+                if (finalPdfDocument != null) {
+                    if (recycled) {
+                        AsyncTask.THREAD_POOL_EXECUTOR.execute(()-> pdfiumCore.closeDocument(finalPdfDocument));
+                    } else {
+                        loadComplete(new PdfFile(
+                                pdfiumCore,
+                                finalPdfDocument,
+                                getPageFitPolicy(),
+                                new Size(getWidth(), getHeight()),
+                                userPages,
+                                isOnDualPageMode(),
+                                isSwipeVertical(),
+                                getSpacingPx(),
+                                isAutoSpacingEnabled(),
+                                isFitEachPage(),
+                                isOnLandscapeOrientation()));
+                    }
+                } else {
+                    if (!recycled) {
+                        loadError(finalLoadError);
+                    }
+                }
+            })) {
+                pdfiumCore.closeDocument(pdfDocument);
+            }
+        });
     }
 
     /**
@@ -474,22 +512,8 @@ public class PDFView extends RelativeLayout {
         animationManager.stopAll();
         dragPinchManager.disable();
 
-        // Stop tasks
         if (renderingHandler != null) {
-            renderingHandler.stop();
-        }
-
-        if (decodingAsyncTask != null) {
-            decodingAsyncTask.cancel(true);
-        }
-
-        if (renderingHandlerThread != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                renderingHandlerThread.quitSafely();
-            } else {
-                renderingHandlerThread.quit();
-            }
-            renderingHandlerThread = null;
+            renderingHandler.purge();
         }
 
         // Clear caches
@@ -502,10 +526,10 @@ public class PDFView extends RelativeLayout {
         final PdfFile currentPdfFile = this.pdfFile;
         this.pdfFile = null;
         if (currentPdfFile != null) {
-            AsyncTask.THREAD_POOL_EXECUTOR.execute(currentPdfFile::dispose);
+            dispatchWorkOnRenderer(currentPdfFile::dispose);
         }
+        stopRenderingThread();
 
-        renderingHandler = null;
         scrollHandle = null;
         isScrollHandleInit = false;
         currentXOffset = currentYOffset = 0;
@@ -820,13 +844,7 @@ public class PDFView extends RelativeLayout {
 
         this.pdfFile = pdfFile;
 
-        if (renderingHandlerThread == null) {
-            renderingHandlerThread = new HandlerThread("PDF renderer");
-            renderingHandlerThread.start();
-        }
-
-        renderingHandler = new RenderingHandler(renderingHandlerThread.getLooper(), this);
-        renderingHandler.start();
+        startRenderingThread();
 
         if (scrollHandle != null) {
             scrollHandle.setupLayout(this);
@@ -838,6 +856,31 @@ public class PDFView extends RelativeLayout {
         callbacks.callOnLoadComplete(pdfFile.getPagesCount());
 
         jumpTo(defaultPage, false);
+    }
+
+    private boolean stopRenderingThread() {
+        if (renderingHandlerThread == null) return false;
+        renderingHandler.stop();
+        renderingHandlerThread.quitSafely();
+        renderingHandlerThread = null;
+        renderingHandler = null;
+
+        return true;
+    }
+
+    private boolean dispatchWorkOnRenderer(Runnable runnable) {
+        return renderingHandler != null && renderingHandler.post(runnable);
+    }
+
+    private boolean startRenderingThread() {
+        if (renderingHandlerThread != null) return false;
+
+        renderingHandlerThread = new HandlerThread("PDF renderer");
+        renderingHandlerThread.start();
+
+        renderingHandler = new RenderingHandler(renderingHandlerThread.getLooper(), this);
+        renderingHandler.start();
+        return true;
     }
 
     void loadError(Throwable t) {
