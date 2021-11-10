@@ -18,9 +18,8 @@ package com.github.barteksc.pdfviewer;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.util.SparseArray;
-import android.util.SparseBooleanArray;
 
+import androidx.annotation.WorkerThread;
 import androidx.core.util.ObjectsCompat;
 
 import com.github.barteksc.pdfviewer.exception.PageRenderingException;
@@ -33,13 +32,11 @@ import com.shockwave.pdfium.util.SizeF;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 class PdfFile {
 
+    private final Size viewSize;
     private PdfDocument pdfDocument;
     private final PdfiumCore pdfiumCore;
     private int pagesCount = 0;
@@ -86,11 +83,10 @@ class PdfFile {
      */
     private int[] originalUserPages;
 
-    PdfFile(PdfiumCore pdfiumCore, PdfDocument pdfDocument, FitPolicy pageFitPolicy, Size viewSize, int[] originalUserPages,
+    PdfFile(PdfiumCore pdfiumCore, FitPolicy pageFitPolicy, Size viewSize, int[] originalUserPages,
             boolean showTwoPages, boolean isVertical, int spacing, boolean autoSpacing, boolean fitEachPage, boolean isLandscape) {
         this.showTwoPages = showTwoPages;
         this.pdfiumCore = pdfiumCore;
-        this.pdfDocument = pdfDocument;
         this.pageFitPolicy = pageFitPolicy;
         this.originalUserPages = originalUserPages;
         this.isVertical = isVertical;
@@ -98,6 +94,15 @@ class PdfFile {
         this.autoSpacing = autoSpacing;
         this.fitEachPage = fitEachPage;
         this.isLandscape = isLandscape;
+        this.viewSize = viewSize;
+    }
+
+    @WorkerThread
+    void attach(PdfDocument pdfDocument) {
+        if (this.pdfDocument != null) {
+            throw new IllegalStateException("Already attached to a document.");
+        }
+        this.pdfDocument = pdfDocument;
         setup(viewSize);
     }
 

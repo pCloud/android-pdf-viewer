@@ -75,6 +75,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * It supports animations, zoom, cache, and swipe.
@@ -320,6 +321,8 @@ public class PDFView extends RelativeLayout {
         load(docSource, password, null);
     }
 
+    private final AtomicLong loadId = new AtomicLong(0L);
+
     private void load(DocumentSource docSource, String password, int[] userPages) {
         if (!recycled) {
             throw new IllegalStateException("Don't call load on a PDF View without recycling it first.");
@@ -334,43 +337,42 @@ public class PDFView extends RelativeLayout {
             handler = new Handler(Looper.myLooper());
         }
         startRenderingThread();
+
+        final long loadId = this.loadId.incrementAndGet();
+        final PdfFile pdfFile = new PdfFile(
+                pdfiumCore,
+                getPageFitPolicy(),
+                new Size(getWidth(), getHeight()),
+                userPages,
+                isOnDualPageMode(),
+                isSwipeVertical(),
+                getSpacingPx(),
+                isAutoSpacingEnabled(),
+                isFitEachPage(),
+                isOnLandscapeOrientation());
         dispatchWorkOnRenderer(() -> {
             PdfDocument pdfDocument = null;
-            Throwable loadError = null;
+            boolean success = false;
             try {
                 pdfDocument = docSource.createDocument(getContext(), pdfiumCore, password);
-            } catch (Exception e) {
-                loadError = e;
-            }
-
-            PdfDocument finalPdfDocument = pdfDocument;
-            Throwable finalLoadError = loadError;
-
-            if (!handler.post(() -> {
-                if (finalPdfDocument != null) {
-                    if (recycled) {
-                        AsyncTask.THREAD_POOL_EXECUTOR.execute(()-> pdfiumCore.closeDocument(finalPdfDocument));
+                pdfFile.attach(pdfDocument);
+                success = handler.post(() -> {
+                    if (this.loadId.get() == loadId && !recycled) {
+                        loadComplete(pdfFile);
                     } else {
-                        loadComplete(new PdfFile(
-                                pdfiumCore,
-                                finalPdfDocument,
-                                getPageFitPolicy(),
-                                new Size(getWidth(), getHeight()),
-                                userPages,
-                                isOnDualPageMode(),
-                                isSwipeVertical(),
-                                getSpacingPx(),
-                                isAutoSpacingEnabled(),
-                                isFitEachPage(),
-                                isOnLandscapeOrientation()));
+                        AsyncTask.THREAD_POOL_EXECUTOR.execute(pdfFile::dispose);
                     }
-                } else {
-                    if (!recycled) {
-                        loadError(finalLoadError);
+                });
+            } catch (Exception e) {
+                handler.post(() -> {
+                    if (this.loadId.get() == loadId && !recycled) {
+                        loadError(e);
                     }
+                });
+            } finally {
+                if (!success && pdfDocument != null) {
+                    pdfiumCore.closeDocument(pdfDocument);
                 }
-            })) {
-                pdfiumCore.closeDocument(pdfDocument);
             }
         });
     }
