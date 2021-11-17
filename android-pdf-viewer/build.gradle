@@ -11,7 +11,7 @@ android {
         minSdkVersion 18
         targetSdkVersion 31
         versionCode 1
-        versionName "3.3.0"
+        versionName "3.3.4"
     }
 }
 
@@ -31,7 +31,7 @@ afterEvaluate {
                 // You can then customize attributes of the publication as shown below.
                 groupId = 'com.pcloud'
                 artifactId = 'android-pdf-viewer'
-                version = '3.3.0'
+                version = '3.3.4'
             }
         }
     }
