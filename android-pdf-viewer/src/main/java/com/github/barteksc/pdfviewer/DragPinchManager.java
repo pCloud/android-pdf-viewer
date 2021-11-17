@@ -15,6 +15,9 @@
  */
 package com.github.barteksc.pdfviewer;
 
+import static com.github.barteksc.pdfviewer.util.Constants.Pinch.MAXIMUM_ZOOM;
+import static com.github.barteksc.pdfviewer.util.Constants.Pinch.MINIMUM_ZOOM;
+
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.view.GestureDetector;
@@ -28,8 +31,8 @@ import com.github.barteksc.pdfviewer.util.SnapEdge;
 import com.shockwave.pdfium.PdfDocument;
 import com.shockwave.pdfium.util.SizeF;
 
-import static com.github.barteksc.pdfviewer.util.Constants.Pinch.MAXIMUM_ZOOM;
-import static com.github.barteksc.pdfviewer.util.Constants.Pinch.MINIMUM_ZOOM;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * This Manager takes care of moving the PDFView,
@@ -103,13 +106,17 @@ class DragPinchManager implements GestureDetector.OnGestureListener, GestureDete
             pageX = (int) pdfFile.getPageOffset(page, pdfView.getZoom());
         }
         if (pdfFile.isPageOpen(page) && !pdfFile.pageHasError(page)){
-            for (PdfDocument.Link link : pdfFile.getPageLinks(page)) {
-                RectF mapped = pdfFile.mapRectToDevice(page, pageX, pageY, (int) pageSize.getWidth(),
-                        (int) pageSize.getHeight(), link.getBounds());
-                mapped.sort();
-                if (mapped.contains(mappedX, mappedY)) {
-                    pdfView.callbacks.callLinkHandler(new LinkTapEvent(x, y, mappedX, mappedY, mapped, link));
-                    return true;
+            List<PdfDocument.Link> pageLinks = pdfFile.getPageLinks(page);
+            if (pageLinks == null) pageLinks = Collections.emptyList();
+            if (!pageLinks.isEmpty()) {
+                for (PdfDocument.Link link : pageLinks) {
+                    RectF mapped = pdfFile.mapRectToDevice(page, pageX, pageY, (int) pageSize.getWidth(),
+                            (int) pageSize.getHeight(), link.getBounds());
+                    mapped.sort();
+                    if (mapped.contains(mappedX, mappedY)) {
+                        pdfView.callbacks.callLinkHandler(new LinkTapEvent(x, y, mappedX, mappedY, mapped, link));
+                        return true;
+                    }
                 }
             }
         }

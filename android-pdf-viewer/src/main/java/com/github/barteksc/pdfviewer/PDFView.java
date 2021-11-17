@@ -37,6 +37,8 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.widget.RelativeLayout;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
 
 import com.github.barteksc.pdfviewer.exception.PageRenderingException;
@@ -1396,6 +1398,7 @@ public class PDFView extends RelativeLayout {
     /**
      * Returns null if document is not loaded
      */
+    @Nullable
     public PdfDocument.Meta getDocumentMeta() {
         if (pdfFile == null) {
             return null;
@@ -1406,6 +1409,7 @@ public class PDFView extends RelativeLayout {
     /**
      * Will be empty until document is loaded
      */
+    @NonNull
     public List<PdfDocument.Bookmark> getTableOfContents() {
         if (pdfFile == null) {
             return Collections.emptyList();
@@ -1413,9 +1417,7 @@ public class PDFView extends RelativeLayout {
         return pdfFile.getBookmarks();
     }
 
-    /**
-     * Will be empty until document is loaded
-     */
+    @Nullable
     public List<PdfDocument.Link> getLinks(int page) {
         if (pdfFile == null) {
             return Collections.emptyList();

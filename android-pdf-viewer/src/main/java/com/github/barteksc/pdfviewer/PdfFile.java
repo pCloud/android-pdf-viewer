@@ -19,6 +19,8 @@ import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.graphics.RectF;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 import androidx.core.util.ObjectsCompat;
 
@@ -31,6 +33,7 @@ import com.shockwave.pdfium.util.Size;
 import com.shockwave.pdfium.util.SizeF;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -153,6 +156,7 @@ class PdfFile {
         return pagesCount;
     }
 
+    @NonNull
     public SizeF getPageSize(int pageIndex) {
         int docPage = documentPage(pageIndex);
         if (docPage < 0) {
@@ -161,6 +165,7 @@ class PdfFile {
         return pageSizes.get(pageIndex);
     }
 
+    @NonNull
     public SizeF getScaledPageSize(int pageIndex, float zoom) {
         SizeF size = getPageSize(pageIndex);
         return new SizeF(size.getWidth() * zoom, size.getHeight() * zoom);
@@ -171,6 +176,7 @@ class PdfFile {
      *
      * @return size of page
      */
+    @NonNull
     public SizeF getMaxPageSize() {
         return isVertical ? maxWidthPageSize : maxHeightPageSize;
     }
@@ -323,6 +329,7 @@ class PdfFile {
                 bounds.left, bounds.top, bounds.width(), bounds.height(), annotationRendering);
     }
 
+    @Nullable
     public PdfDocument.Meta getMetaData() {
         if (pdfDocument == null) {
             return null;
@@ -330,18 +337,21 @@ class PdfFile {
         return pdfiumCore.getDocumentMeta(pdfDocument);
     }
 
+    @NonNull
     public List<PdfDocument.Bookmark> getBookmarks() {
         if (pdfDocument == null) {
-            return new ArrayList<>();
+            return Collections.emptyList();
         }
         return pdfiumCore.getTableOfContents(pdfDocument);
     }
 
+    @Nullable
     public List<PdfDocument.Link> getPageLinks(int pageIndex) {
         int docPage = documentPage(pageIndex);
         return openedPageLinks.get(docPage);
     }
 
+    @NonNull
     public RectF mapRectToDevice(int pageIndex, int startX, int startY, int sizeX, int sizeY,
                                  RectF rect) {
         int docPage = documentPage(pageIndex);
