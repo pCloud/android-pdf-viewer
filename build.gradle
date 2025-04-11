@@ -5,14 +5,45 @@ buildscript {
         maven { url 'https://jitpack.io' }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.0.2'
+        classpath 'com.android.tools.build:gradle:8.9.1'
     }
 }
 
 allprojects {
+
+    ext.applyForPlugin = { String plugin, Action<Project> action ->
+        applyForPlugins([plugin], action)
+    }
+
+    ext.applyForPlugins = { Iterable<String> plugins, Action<Project> action ->
+        for (String plugin : plugins) {
+            if (project.plugins.hasPlugin(plugin)) {
+                action.call(project)
+            } else {
+                project.plugins.withId(plugin, {
+                    action.call(project)
+                })
+            }
+        }
+    }
+
     repositories {
         google()
         mavenCentral()
         maven { url 'https://jitpack.io' }
+    }
+}
+
+subprojects {
+
+    applyForPlugin('java') {
+        java {
+            sourceCompatibility JavaVersion.toVersion(JavaVersion.VERSION_11)
+            targetCompatibility JavaVersion.toVersion(JavaVersion.VERSION_11)
+
+            toolchain {
+                languageVersion = JavaVersion.toVersion(JavaVersion.VERSION_17)
+            }
+        }
     }
 }

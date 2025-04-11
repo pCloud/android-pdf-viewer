@@ -80,13 +80,9 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.pickFile:
-                pickFile();
-
-                break;
-        }
-
+		if (item.getItemId() == R.id.pickFile) {
+			pickFile();
+		}
         return true;
     }
 
@@ -199,16 +195,14 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
     public String getFileName(Uri uri) {
         String result = null;
         if (uri.getScheme().equals("content")) {
-            Cursor cursor = getContentResolver().query(uri, null, null, null, null);
-            try {
-                if (cursor != null && cursor.moveToFirst()) {
-                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
-                }
-            } finally {
-                if (cursor != null) {
-                    cursor.close();
-                }
-            }
+			try (Cursor cursor = getContentResolver().query(uri, null, null, null, null)) {
+				if (cursor != null && cursor.moveToFirst()) {
+					int columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+					if (columnIndex != -1) {
+						result = cursor.getString(columnIndex);
+					}
+				}
+			}
         }
         if (result == null) {
             result = uri.getLastPathSegment();
