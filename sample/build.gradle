@@ -1,8 +1,8 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.github.barteksc.sample"
-    compileSdkVersion 35
+    namespace = "com.github.barteksc.sample"
+    compileSdkVersion = 35
 
     defaultConfig {
         applicationId "com.pdfviewer"
