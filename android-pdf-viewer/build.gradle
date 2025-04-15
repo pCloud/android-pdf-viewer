@@ -5,8 +5,8 @@ plugins {
 apply plugin: 'com.android.library'
 
 android {
-    namespace 'com.github.barteksc.pdfviewer'
-    compileSdkVersion 35
+    namespace = 'com.github.barteksc.pdfviewer'
+    compileSdkVersion = 35
 
     defaultConfig {
         minSdkVersion 24
@@ -29,7 +29,7 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core:1.6.0'
+    implementation 'androidx.core:core:1.16.0'
     api 'com.github.pcloud:pdfium-core:2.0.0'
 }
 

@@ -30,11 +30,25 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }
+        maven { url = 'https://jitpack.io' }
     }
 }
 
 subprojects {
+
+    def kotlinVersion = "2.0.0"
+
+    //noinspection ConfigurationAvoidance
+    configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                if (details.requested.name.startsWith('kotlin-stdlib')) {
+                    details.because "Enforce a single Kotlin version ($kotlinVersion)."
+                    details.useVersion kotlinVersion
+                }
+            }
+        }
+    }
 
     applyForPlugin('java') {
         java {
