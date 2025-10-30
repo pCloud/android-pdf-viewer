@@ -12,7 +12,7 @@ android {
         minSdkVersion 24
         targetSdkVersion 35
         versionCode 1
-        versionName "3.4.0"
+        versionName "3.5.0"
     }
 
     compileOptions {
@@ -30,7 +30,7 @@ android {
 
 dependencies {
     implementation 'androidx.core:core:1.16.0'
-    api 'com.github.pcloud:pdfium-core:2.0.0'
+    api 'com.github.pcloud:pdfium-core:2.1.0'
 }
 
 afterEvaluate {
@@ -44,7 +44,7 @@ afterEvaluate {
                 // You can then customize attributes of the publication as shown below.
                 groupId = 'com.pcloud'
                 artifactId = 'android-pdf-viewer'
-                version = '3.4.0'
+                version = '3.5.0'
             }
         }
     }
